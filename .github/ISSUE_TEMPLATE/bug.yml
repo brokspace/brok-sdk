@@ -1,0 +1,49 @@
+name: Bug
+description: brok-sdk behaves differently from its documentation or the protocol.
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This repository holds the shard protocol, the `shard.json` manifest rules and the Rust client. Problems with the `brok` CLI or runtime belong in [brokspace/brok](https://github.com/brokspace/brok/issues).
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: brok-sdk version, `rustc --version`, OS. If a runtime is involved, the output of `brok --version`.
+      placeholder: brok-sdk 0.1.0, rustc 1.89.0, Ubuntu 24.04
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Client (connect, subscribe, request/reply)
+        - Manifest (shard.json validation, schema)
+        - Protocol (frames, codec, topics)
+        - Transport (Unix sockets, named pipes)
+        - Docs
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: The smallest code or `shard.json` that shows the problem.
+      render: rust
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: Link the doc comment, README line or protocol rule that says so, if any.
+    validations:
+      required: true

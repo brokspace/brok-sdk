@@ -1,0 +1,32 @@
+name: Idea or feedback
+description: A change to the shard protocol, manifest or client, grounded in a shard you are building.
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        brok-sdk is a public contract used by third-party shards, so changes are judged carefully against [`SCOPE.md`](https://github.com/brokspace/brok/blob/main/SCOPE.md):
+
+        1. **Observed problem**: something that got in your way while building a real shard.
+        2. **Fits the philosophy**: additive and backwards compatible where possible; breaking protocol changes need a migration story.
+  - type: checkboxes
+    id: read-scope
+    attributes:
+      label: Before filing
+      options:
+        - label: I've read `SCOPE.md` and checked `.out-of-scope/` in brokspace/brok, and this is not covered by either.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What got in your way
+      description: What your shard needed to do, what you tried with the current SDK, and why it fell short.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: The API, frame or manifest field you have in mind. Is it additive or breaking?
+    validations:
+      required: true

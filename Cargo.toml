@@ -1,0 +1,37 @@
+[package]
+name = "brok-sdk"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Protocol, shard manifest and IPC client for building Brokspace shards"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/brokspace/brok-sdk"
+homepage = "https://github.com/brokspace/brok"
+documentation = "https://docs.rs/brok-sdk"
+readme = "README.md"
+keywords = ["brokspace", "ipc", "agents", "plugins", "event-bus"]
+categories = ["development-tools", "asynchronous", "network-programming"]
+
+[dependencies]
+bytes = "1.10"
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+semver = { version = "1.0", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tokio = { version = "1.47", features = ["io-util", "macros", "net", "rt", "sync", "time"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+tracing = "0.1"
+uuid = { version = "1.18", features = ["serde", "v4"] }
+
+[dev-dependencies]
+tempfile = "3.20"
+uuid = { version = "1.18", features = ["v4"] }
+tokio = { version = "1.47", features = ["full"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
