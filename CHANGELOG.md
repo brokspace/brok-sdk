@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-24
+
 ### Added
 
 - Wire protocol v1: `Hello` / `Welcome` handshake, `Subscribe`, `Publish`,
