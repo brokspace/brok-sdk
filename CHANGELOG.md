@@ -17,5 +17,7 @@ adheres to [Semantic Versioning](https://semver.org/).
 - Topic and topic pattern validation with coverage checks.
 - `ShardManifest` (`shard.json`) parsing, exhaustive validation and
   capability reports, plus `shard.schema.json` for editors.
+- Skill shards: `skills` directories in `shard.json` (`entrypoint` optional
+  for skill-only shards) and `SkillInvocation` on `AskRequest`.
 - Cross-platform transport (Unix domain sockets, Windows named pipes).
 - `BrokClient` with pub/sub, request/reply streams and typed calls.
