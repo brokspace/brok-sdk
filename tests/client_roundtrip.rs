@@ -89,7 +89,7 @@ async fn pubsub_and_request_reply() {
     let event = tokio::time::timeout(Duration::from_secs(5), inbox.recv()).await.unwrap().unwrap();
     assert_eq!(event.decode::<FileChanged>().unwrap().changed, vec!["a.rs"]);
 
-    let ask = AskRequest { prompt: "hello".into(), provider: None, context_chunks: None, skill: None };
+    let ask = AskRequest { prompt: "hello".into(), provider: None, context_chunks: None, skill: None, history: vec![] };
     let mut replies = client.request(Event::from_payload(&ask).unwrap()).await.unwrap();
     let mut answer = String::new();
     for _ in 0..2 {

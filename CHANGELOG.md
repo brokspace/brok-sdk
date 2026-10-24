@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-25
+
+### Added
+
+- `AskRequest::history` (`ChatTurn`, `ChatRole`) for multi-turn chats.
+
+First release published on crates.io.
+
 ## [0.1.0] - 2026-10-24
 
 ### Added

@@ -144,6 +144,28 @@ pub struct AskRequest {
     /// Run the request under a skill's instructions (`brok skill run`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skill: Option<SkillInvocation>,
+    /// Earlier turns of the conversation, oldest first (`brok chat`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub history: Vec<ChatTurn>,
+}
+
+/// Who said a [`ChatTurn`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ChatRole {
+    /// The person asking.
+    User,
+    /// The agent.
+    Assistant,
+}
+
+/// One earlier message of a conversation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChatTurn {
+    /// Speaker.
+    pub role: ChatRole,
+    /// What was said.
+    pub content: String,
 }
 payload!(AskRequest => topics::AGENT_ASK);
 
