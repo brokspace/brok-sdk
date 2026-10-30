@@ -8,3 +8,6 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    ignore:
+      # `@1.85` selects the MSRV toolchain; it is not an action version.
+      - dependency-name: dtolnay/rust-toolchain
