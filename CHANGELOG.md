@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-30
+
 ### Fixed
 
 - `ShardManifest::from_json` (and `load_from_dir`) ignore a leading byte
