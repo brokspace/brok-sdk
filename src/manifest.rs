@@ -158,9 +158,10 @@ pub fn current_platform() -> String {
 }
 
 impl ShardManifest {
-    /// Parses and validates a manifest from JSON text.
+    /// Parses and validates a manifest from JSON text. A leading byte order
+    /// mark (Notepad, Windows PowerShell 5.1) is ignored.
     pub fn from_json(json: &str) -> Result<Self, ManifestError> {
-        let manifest: Self = serde_json::from_str(json)?;
+        let manifest: Self = serde_json::from_str(json.trim_start_matches('\u{feff}'))?;
         manifest.validate()?;
         Ok(manifest)
     }
@@ -334,6 +335,12 @@ mod tests {
       "subscribes_to": ["file:changed"],
       "publishes_to": ["security:alert"]
     }"#;
+
+    #[test]
+    fn a_byte_order_mark_is_ignored() {
+        let with_bom = format!("\u{feff}{SAMPLE}");
+        assert_eq!(ShardManifest::from_json(&with_bom).unwrap(), ShardManifest::from_json(SAMPLE).unwrap());
+    }
 
     #[test]
     fn parses_the_reference_manifest() {

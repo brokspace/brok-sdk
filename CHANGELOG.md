@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- `ShardManifest::from_json` (and `load_from_dir`) ignore a leading byte
+  order mark: a `shard.json` saved by Notepad or Windows PowerShell 5.1 was
+  rejected as malformed and its shard ignored.
+
 ## [0.1.1] - 2026-10-25
 
 ### Added
