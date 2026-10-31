@@ -1,3 +1,9 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/brokspace-on-dark.svg">
+    <img src=".github/assets/brokspace.svg" alt="Brokspace" height="44">
+  </picture>
+</p>
 # brok-sdk
 
 [![crates.io](https://img.shields.io/crates/v/brok-sdk.svg)](https://crates.io/crates/brok-sdk)
