@@ -10,10 +10,16 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Pushes to staging/main must finish: they fill the build cache PRs restore.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
+  # CI builds are not incremental, and line tables are enough for backtraces:
+  # both make builds and the saved caches much smaller.
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_TEST_DEBUG: line-tables-only
 
 jobs:
   test:
@@ -29,10 +35,14 @@ jobs:
         with:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main' }}
       - name: Format
         if: matrix.os == 'ubuntu-latest'
         run: cargo fmt --check
+      # Lints do not depend on the OS; the other systems only build and test.
       - name: Clippy
+        if: matrix.os == 'ubuntu-latest'
         run: cargo clippy --all-targets -- -D warnings
       - name: Test
         run: cargo test
@@ -47,4 +57,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@1.85
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main' }}
       - run: cargo check
