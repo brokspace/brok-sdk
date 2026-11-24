@@ -110,6 +110,32 @@ pub struct ShardContext {
     /// are never included: providers reference environment variables.
     #[serde(default)]
     pub llm: Value,
+    /// Repositories registered as members of a Meta Workspace
+    /// (`workspace.members` in `brok.yml`) that exist on this machine.
+    /// Empty when the workspace has no members, and then omitted from the
+    /// frame, so a shard built against an older SDK sees nothing new.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub members: Vec<MemberInfo>,
+}
+
+/// A Meta Workspace member as a shard sees it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct MemberInfo {
+    /// Stable member id (lowercase kebab-case).
+    pub id: String,
+    /// Absolute directory of the member on this machine.
+    pub root: PathBuf,
+    /// Whether the member has a Brokspace (index) of its own, so it can be
+    /// searched without being indexed.
+    pub has_brokspace: bool,
+}
+
+impl MemberInfo {
+    /// Creates a member entry.
+    pub fn new(id: impl Into<String>, root: impl Into<PathBuf>, has_brokspace: bool) -> Self {
+        Self { id: id.into(), root: root.into(), has_brokspace }
+    }
 }
 
 /// Reason a request was rejected.
@@ -144,5 +170,26 @@ mod tests {
     fn hello_debug_redacts_token() {
         let hello = Hello { protocol: 1, name: "x".into(), version: "0".into(), token: "secret".into() };
         assert!(!format!("{hello:?}").contains("secret"));
+    }
+}
+
+#[cfg(test)]
+mod members_tests {
+    use super::*;
+
+    #[test]
+    fn an_empty_member_list_is_not_serialized() {
+        let json = serde_json::to_value(ShardContext::default()).unwrap();
+        assert!(json.get("members").is_none());
+    }
+
+    #[test]
+    fn members_round_trip_and_old_frames_still_parse() {
+        let mut ctx = ShardContext::default();
+        ctx.members.push(MemberInfo::new("api", "/work/api", true));
+        let back: ShardContext = serde_json::from_str(&serde_json::to_string(&ctx).unwrap()).unwrap();
+        assert_eq!(back, ctx);
+        let old: ShardContext = serde_json::from_str(r#"{"workspace_root":"/w"}"#).unwrap();
+        assert!(old.members.is_empty());
     }
 }
