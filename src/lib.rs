@@ -44,7 +44,7 @@ pub mod transport;
 pub use client::{BrokClient, ConnectOptions, Inbox, Replies};
 pub use error::{ClientError, ManifestError, TopicError};
 pub use event::Event;
-pub use frame::{ClientFrame, ErrorCode, ServerFrame, ShardContext, Welcome};
+pub use frame::{ClientFrame, ErrorCode, MemberInfo, ServerFrame, ShardContext, Welcome};
 pub use manifest::ShardManifest;
 pub use payload::Payload;
 pub use topic::{Topic, TopicPattern};
