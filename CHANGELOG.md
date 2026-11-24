@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-24
+
 ### Added
 
 - `ShardContext::members` and `MemberInfo`: the Meta Workspace members (id, directory, whether they have a Brokspace of their own) that exist on this machine. Omitted from the frame when empty, and absent frames parse as empty.
