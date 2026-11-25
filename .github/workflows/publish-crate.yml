@@ -1,0 +1,67 @@
+name: Publish crate
+
+# Publishes brok-sdk to crates.io from a release tag, using crates.io Trusted
+# Publishing (OIDC). A Trusted Publisher matches the workflow file in the OIDC
+# identity, so this is its own workflow. Configure it on the brok-sdk crate
+# with owner=brokspace, repository=brok-sdk, workflow=publish-crate.yml,
+# environment=crates-io. Until the Trusted Publisher exists the
+# CARGO_REGISTRY_TOKEN secret is used as a fallback.
+#
+# Re-run by hand with: gh workflow run publish-crate.yml -f tag=vX.Y.Z
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (e.g. v0.3.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: crates-io
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: The tag matches the crate version
+        run: |
+          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"
+          [ "v$version" = "$TAG" ] || { echo "::error::tag $TAG does not match brok-sdk version $version"; exit 1; }
+      - name: Test
+        run: cargo test
+      - name: Skip if this version is already published
+        id: published
+        run: |
+          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')"
+          if curl -fsS -A "brokspace-release (github.com/brokspace/brok-sdk)" "https://crates.io/api/v1/crates/brok-sdk/$version" >/dev/null 2>&1; then
+            echo "brok-sdk $version is already published"
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Authenticate with crates.io Trusted Publishing
+        id: auth
+        # Falls back to CARGO_REGISTRY_TOKEN while no Trusted Publisher exists.
+        continue-on-error: true
+        if: steps.published.outputs.published == 'false'
+        uses: rust-lang/crates-io-auth-action@v1
+      - name: Publish brok-sdk
+        if: steps.published.outputs.published == 'false'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token || secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --allow-dirty
