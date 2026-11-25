@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-24
+
 ### Added
 
 - `SearchRequest::scope` (`SearchScope::Repository`, the default and not sent, or `Workspace`) asks the index service to search the Meta Workspace members too; member hits carry the path `member:path`. An older index service ignores it.
