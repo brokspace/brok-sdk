@@ -60,6 +60,7 @@ payload!(FileChanged => topics::FILE_CHANGED);
 
 /// Hybrid search request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SearchRequest {
     /// Free text query.
     pub query: String,
@@ -69,8 +70,58 @@ pub struct SearchRequest {
     /// Restrict (or prioritise) a partition, e.g. a submodule path.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focus: Option<String>,
+    /// Where to look. The default, this workspace only, is not sent.
+    #[serde(default, skip_serializing_if = "SearchScope::is_default")]
+    pub scope: SearchScope,
 }
 payload!(SearchRequest => topics::INDEX_SEARCH);
+
+impl SearchRequest {
+    /// A request for the default number of hits in this workspace only.
+    pub fn new(query: impl Into<String>) -> Self {
+        Self { query: query.into(), limit: default_limit(), focus: None, scope: SearchScope::Repository }
+    }
+
+    /// Sets the maximum number of hits.
+    #[must_use]
+    pub fn limit(mut self, limit: usize) -> Self {
+        self.limit = limit;
+        self
+    }
+
+    /// Restricts (or prioritises) a partition.
+    #[must_use]
+    pub fn focus(mut self, focus: Option<String>) -> Self {
+        self.focus = focus;
+        self
+    }
+
+    /// Sets where to look.
+    #[must_use]
+    pub fn scope(mut self, scope: SearchScope) -> Self {
+        self.scope = scope;
+        self
+    }
+}
+
+/// Where a [`SearchRequest`] looks.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SearchScope {
+    /// This workspace only.
+    #[default]
+    Repository,
+    /// This workspace and the Meta Workspace members that have a Brokspace.
+    /// Hits from a member have their path prefixed with `member:`. An older
+    /// index service ignores the scope and answers for this workspace only.
+    Workspace,
+}
+
+impl SearchScope {
+    fn is_default(&self) -> bool {
+        *self == Self::Repository
+    }
+}
 
 fn default_limit() -> usize {
     8
@@ -283,5 +334,16 @@ mod tests {
         let req: SearchRequest = serde_json::from_str(r#"{"query":"bus"}"#).unwrap();
         assert_eq!(req.limit, 8);
         assert_eq!(req.focus, None);
+        assert_eq!(req.scope, SearchScope::Repository);
+    }
+
+    #[test]
+    fn scope_is_only_sent_when_it_widens_the_search() {
+        let json = serde_json::to_value(SearchRequest::new("bus")).unwrap();
+        assert!(json.get("scope").is_none());
+        let wide = SearchRequest::new("bus").limit(3).scope(SearchScope::Workspace);
+        let json = serde_json::to_value(&wide).unwrap();
+        assert_eq!(json["scope"], "workspace");
+        assert_eq!(serde_json::from_value::<SearchRequest>(json).unwrap(), wide);
     }
 }
