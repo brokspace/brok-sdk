@@ -117,3 +117,44 @@ async fn bad_token_is_rejected() {
     assert!(matches!(err, ClientError::Rejected { code: ErrorCode::Unauthorized, .. }));
     bus.await.unwrap();
 }
+
+/// A fake bus that, once subscribed, sends `count` events of `bytes` bytes.
+async fn flooding_bus(mut listener: Listener, count: usize, bytes: usize) {
+    let stream = listener.accept().await.unwrap();
+    let mut framed = Framed::new(stream, ServerCodec::new());
+    let Some(Ok(ClientFrame::Hello(hello))) = framed.next().await else { panic!("expected hello") };
+    let welcome = Welcome {
+        protocol: brok_sdk::PROTOCOL_VERSION,
+        session_id: uuid::Uuid::new_v4(),
+        identity: hello.name,
+        context: ShardContext::default(),
+    };
+    framed.send(ServerFrame::Welcome(welcome)).await.unwrap();
+    let Some(Ok(ClientFrame::Subscribe { .. })) = framed.next().await else { panic!("expected subscribe") };
+    for i in 0..count {
+        let changed = vec![i.to_string(), "x".repeat(bytes)];
+        let event = Event::from_payload(&FileChanged { changed, deleted: vec![] }).unwrap();
+        framed.send(ServerFrame::Event { event }).await.unwrap();
+    }
+    let _ = framed.next().await; // wait for the client to leave
+}
+
+#[tokio::test]
+async fn a_slow_consumer_receives_large_events_past_the_byte_budget_in_order() {
+    let dir = tempfile::tempdir().unwrap();
+    let endpoint = unique_endpoint(dir.path());
+    // 96 MiB in all, three times what the inbox may hold.
+    let bus = tokio::spawn(flooding_bus(Listener::bind(&endpoint).unwrap(), 12, 8 * 1024 * 1024));
+
+    let (client, mut inbox) =
+        BrokClient::connect(&endpoint, ConnectOptions::new("test", "0.0.0", "s3cret")).await.unwrap();
+    client.subscribe([TopicPattern::new("file:*").unwrap()]).await.unwrap();
+    tokio::time::sleep(Duration::from_millis(500)).await; // let the inbox fill
+    for i in 0..12 {
+        let event = tokio::time::timeout(Duration::from_secs(20), inbox.recv()).await.unwrap().unwrap();
+        assert_eq!(event.decode::<FileChanged>().unwrap().changed[0], i.to_string());
+    }
+
+    drop((client, inbox));
+    tokio::time::timeout(Duration::from_secs(10), bus).await.unwrap().unwrap();
+}
