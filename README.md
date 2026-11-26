@@ -15,7 +15,7 @@ to join the local event bus.
 
 ```toml
 [dependencies]
-brok-sdk = "0.1"
+brok-sdk = "0.3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -42,8 +42,10 @@ async fn main() -> Result<(), ClientError> {
 }
 ```
 
-Start from the [brok-shard-template](https://github.com/brokspace/brok-shard-template)
-for a complete, tested project with CI and release automation.
+New to shards? [Write your first shard](https://github.com/brokspace/brok/blob/staging/docs/shard-tutorial.md)
+walks through a complete one. Or start from the
+[brok-shard-template](https://github.com/brokspace/brok-shard-template), a tested project with CI and release
+automation (`brok shard new my-shard`).
 
 ## What is inside
 
@@ -65,7 +67,7 @@ use brok_sdk::prelude::*;
 
 async fn related_code(client: &BrokClient) -> Result<(), ClientError> {
     // Ask the index service (your manifest must allow publishing `index:search`).
-    let request = SearchRequest { query: "retry policy".into(), limit: 5, focus: None };
+    let request = SearchRequest::new("retry policy").limit(5);
     let results: SearchResults = client.call(&request, Duration::from_secs(10)).await?;
     for hit in results.hits {
         println!("{}:{} {}", hit.path, hit.start_line, hit.symbol.unwrap_or_default());
