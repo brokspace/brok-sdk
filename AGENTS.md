@@ -14,6 +14,7 @@ src/
   error.rs      public error types
   event.rs      the event envelope
   frame.rs      wire frames (Hello, Welcome, Subscribe, Publish, Event, Error)
+  inbox.rs      the inbound event queue, bounded by count and bytes
   manifest.rs   ShardManifest: parse, validate (all errors at once), capability report
   payload.rs    typed payloads for well-known topics, the Payload trait
   topic.rs      topics and topic patterns

@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The inbox holds at most 32 MiB of event frames, as well as at most `inbox_capacity` events; when full, the client stops reading until the shard takes events. Before, 256 large events could queue gigabytes (brokspace/brok-sdk#25).
+
 ## [0.3.0] - 2026-11-24
 
 ### Added
