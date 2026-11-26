@@ -36,6 +36,7 @@ pub mod env;
 pub mod error;
 pub mod event;
 pub mod frame;
+mod inbox;
 pub mod manifest;
 pub mod payload;
 pub mod topic;

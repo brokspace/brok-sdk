@@ -76,6 +76,42 @@ impl<Out: Serialize, In> Encoder<Out> for JsonCodec<Out, In> {
     }
 }
 
+/// A codec that also reports the size of each frame it reads.
+#[derive(Debug, Default)]
+pub(crate) struct Metered<C> {
+    inner: C,
+    /// Length of the frame being read; the length codec consumes the prefix
+    /// as soon as it arrives, often before the rest of the frame.
+    size: Option<usize>,
+}
+
+impl<C> Metered<C> {
+    pub(crate) fn new(inner: C) -> Self {
+        Self { inner, size: None }
+    }
+}
+
+impl<C: Decoder> Decoder for Metered<C> {
+    /// The frame's payload length in bytes, and the frame.
+    type Item = (usize, C::Item);
+    type Error = C::Error;
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, C::Error> {
+        if self.size.is_none() {
+            self.size = src.first_chunk::<4>().map(|prefix| u32::from_be_bytes(*prefix) as usize);
+        }
+        Ok(self.inner.decode(src)?.map(|frame| (self.size.take().unwrap_or_default(), frame)))
+    }
+}
+
+impl<I, C: Encoder<I>> Encoder<I> for Metered<C> {
+    type Error = C::Error;
+
+    fn encode(&mut self, item: I, dst: &mut BytesMut) -> Result<(), C::Error> {
+        self.inner.encode(item, dst)
+    }
+}
+
 /// Codec used by clients: writes [`ClientFrame`], reads [`ServerFrame`].
 pub type ClientCodec = JsonCodec<ClientFrame, ServerFrame>;
 /// Codec used by the bus: writes [`ServerFrame`], reads [`ClientFrame`].
@@ -84,6 +120,7 @@ pub type ServerCodec = JsonCodec<ServerFrame, ClientFrame>;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::frame::ErrorCode;
     use crate::topic::TopicPattern;
 
     #[test]
@@ -109,6 +146,31 @@ mod tests {
         assert_eq!(server.decode(&mut partial).unwrap(), None);
         partial.unsplit(full);
         assert!(server.decode(&mut partial).unwrap().is_some());
+    }
+
+    #[test]
+    fn metered_reports_frame_sizes_however_the_bytes_arrive() {
+        let mut server = ServerCodec::new();
+        let mut wire = BytesMut::new();
+        let mut sizes = Vec::new();
+        for identity in ["a", "a-much-longer-message"] {
+            let before = wire.len();
+            let frame =
+                ServerFrame::Error { code: ErrorCode::Forbidden, message: identity.into(), correlation_id: None };
+            server.encode(frame, &mut wire).unwrap();
+            sizes.push(wire.len() - before - 4);
+        }
+        for chunk in [1, 3, 7, wire.len()] {
+            let mut client = Metered::new(ClientCodec::new());
+            let (mut buf, mut seen) = (BytesMut::new(), Vec::new());
+            for piece in wire.chunks(chunk) {
+                buf.extend_from_slice(piece);
+                while let Some((size, _)) = client.decode(&mut buf).unwrap() {
+                    seen.push(size);
+                }
+            }
+            assert_eq!(seen, sizes, "in pieces of {chunk}");
+        }
     }
 
     #[test]

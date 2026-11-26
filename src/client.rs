@@ -17,11 +17,12 @@ use tokio::sync::mpsc;
 use tokio_util::codec::Framed;
 use uuid::Uuid;
 
-use crate::codec::ClientCodec;
+use crate::codec::{ClientCodec, Metered};
 use crate::env;
 use crate::error::ClientError;
 use crate::event::Event;
 use crate::frame::{ClientFrame, Hello, ServerFrame, ShardContext, Welcome};
+use crate::inbox;
 use crate::payload::Payload;
 use crate::topic::TopicPattern;
 use crate::transport::{self, Endpoint};
@@ -40,7 +41,8 @@ pub struct ConnectOptions {
     pub version: String,
     /// Session token.
     pub token: String,
-    /// Buffered events before backpressure applies (default 256).
+    /// Buffered events before backpressure applies (default 256). The buffered
+    /// events are also limited to 32 MiB of frames, see [`Inbox`].
     pub inbox_capacity: usize,
 }
 
@@ -77,9 +79,16 @@ struct Inner {
 }
 
 /// Events delivered because they matched a subscription.
+///
+/// The inbox holds at most [`ConnectOptions::inbox_capacity`] events adding up
+/// to at most 32 MiB of frames. When it is full the client stops reading from
+/// the bus until events are taken, which also holds back replies to requests:
+/// keep draining the inbox while waiting for a reply, for instance by handling
+/// events on their own task. A shard that falls far behind makes the bus drop
+/// events for it, which the bus logs.
 #[derive(Debug)]
 pub struct Inbox {
-    rx: mpsc::Receiver<Event>,
+    rx: inbox::Receiver,
 }
 
 impl Inbox {
@@ -138,7 +147,7 @@ impl BrokClient {
     /// Connects to `endpoint` and performs the handshake.
     pub async fn connect(endpoint: &Endpoint, options: ConnectOptions) -> Result<(Self, Inbox), ClientError> {
         let stream = transport::connect(endpoint).await?;
-        let mut framed = Framed::new(stream, ClientCodec::new());
+        let mut framed = Framed::new(stream, Metered::new(ClientCodec::new()));
 
         framed
             .send(ClientFrame::Hello(Hello {
@@ -153,16 +162,16 @@ impl BrokClient {
             Err(_) => return Err(ClientError::Timeout),
             Ok(None) => return Err(ClientError::Closed),
             Ok(Some(Err(e))) => return Err(e.into()),
-            Ok(Some(Ok(ServerFrame::Welcome(welcome)))) => welcome,
-            Ok(Some(Ok(ServerFrame::Error { code, message, .. }))) => {
+            Ok(Some(Ok((_, ServerFrame::Welcome(welcome))))) => welcome,
+            Ok(Some(Ok((_, ServerFrame::Error { code, message, .. })))) => {
                 return Err(ClientError::Rejected { code, message });
             }
-            Ok(Some(Ok(other))) => return Err(ClientError::Handshake(format!("unexpected frame {other:?}"))),
+            Ok(Some(Ok((_, other)))) => return Err(ClientError::Handshake(format!("unexpected frame {other:?}"))),
         };
 
         let (mut sink, mut stream) = framed.split();
         let (out_tx, mut out_rx) = mpsc::channel::<ClientFrame>(64);
-        let (inbox_tx, inbox_rx) = mpsc::channel::<Event>(options.inbox_capacity.max(1));
+        let (inbox_tx, inbox_rx) = inbox::channel(options.inbox_capacity, inbox::INBOX_BYTES);
         let pending: Arc<PendingMap> = Arc::default();
         // Named pipes cannot be half-closed, so the writer tells the reader to
         // drop its half as well; only then is the handle actually released.
@@ -189,26 +198,29 @@ impl BrokClient {
                     },
                     _ = &mut writer_done_rx => break,
                 };
+                let (size, frame) = match frame {
+                    Ok(frame) => frame,
+                    Err(e) => {
+                        tracing::warn!(error = %e, "bus connection failed");
+                        break;
+                    }
+                };
                 match frame {
-                    Ok(ServerFrame::Event { event }) => {
+                    ServerFrame::Event { event } => {
                         if let Some(tx) = reply_slot(&reader_pending, event.correlation_id) {
                             let _ = tx.send(Ok(event)).await;
-                        } else if inbox_tx.send(event).await.is_err() {
+                        } else if !inbox_tx.send(event, size).await {
                             tracing::trace!("inbox dropped; discarding event");
                         }
                     }
-                    Ok(ServerFrame::Error { code, message, correlation_id }) => {
+                    ServerFrame::Error { code, message, correlation_id } => {
                         if let Some(tx) = reply_slot(&reader_pending, correlation_id) {
                             let _ = tx.send(Err(ClientError::Rejected { code, message })).await;
                         } else {
                             tracing::warn!(?code, %message, "bus reported an error");
                         }
                     }
-                    Ok(ServerFrame::Welcome(_)) => tracing::warn!("ignoring unexpected welcome frame"),
-                    Err(e) => {
-                        tracing::warn!(error = %e, "bus connection failed");
-                        break;
-                    }
+                    ServerFrame::Welcome(_) => tracing::warn!("ignoring unexpected welcome frame"),
                 }
             }
             // Wake up everyone waiting for replies.

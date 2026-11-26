@@ -1,6 +1,6 @@
 [package]
 name = "brok-sdk"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 rust-version = "1.85"
 description = "Protocol, shard manifest and IPC client for building Brokspace shards"
@@ -27,7 +27,7 @@ uuid = { version = "1.18", features = ["serde", "v4"] }
 [dev-dependencies]
 tempfile = "3.20"
 uuid = { version = "1.18", features = ["v4"] }
-tokio = { version = "1.47", features = ["full"] }
+tokio = { version = "1.47", features = ["full", "test-util"] }
 
 [lints.rust]
 unsafe_code = "forbid"
