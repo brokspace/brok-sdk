@@ -6,6 +6,7 @@
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// A serializable payload bound to a topic.
 pub trait Payload: Serialize + DeserializeOwned {
@@ -43,6 +44,8 @@ pub mod topics {
     pub const REVIEW_RESULT: &str = "review:result";
     /// The runtime is shutting down ([`super::Shutdown`]).
     pub const SYSTEM_SHUTDOWN: &str = "system:shutdown";
+    /// Whoever asked has left ([`super::RequestCancelled`]).
+    pub const SYSTEM_REQUEST_CANCELLED: &str = "system:request.cancelled";
 }
 
 /// Files changed in the workspace. Paths are relative to the workspace root
@@ -306,6 +309,19 @@ pub struct Shutdown {
 }
 payload!(Shutdown => topics::SYSTEM_SHUTDOWN);
 
+/// The client that published a request left the bus before it was answered:
+/// whoever is working on it should stop, including calls it pays for.
+///
+/// Published by the runtime only, to the sessions that received the request,
+/// without a subscription. Today it is sent for [`AskRequest`]; a runtime that
+/// predates it never sends it, and a shard that predates it may ignore it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RequestCancelled {
+    /// [`Event::id`](crate::Event::id) of the request.
+    pub request: Uuid,
+}
+payload!(RequestCancelled => topics::SYSTEM_REQUEST_CANCELLED);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -324,9 +340,19 @@ mod tests {
             AskFailed::TOPIC,
             ReviewResult::TOPIC,
             Shutdown::TOPIC,
+            RequestCancelled::TOPIC,
         ] {
             Topic::new(topic).unwrap();
         }
+    }
+
+    #[test]
+    fn a_cancellation_names_its_request() {
+        let request = Uuid::new_v4();
+        let json = serde_json::to_value(RequestCancelled { request }).unwrap();
+        assert_eq!(json, serde_json::json!({ "request": request.to_string() }));
+        assert_eq!(serde_json::from_value::<RequestCancelled>(json).unwrap().request, request);
+        assert!(RequestCancelled::TOPIC.starts_with("system:"), "only the runtime may publish it");
     }
 
     #[test]
