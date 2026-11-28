@@ -6,6 +6,8 @@ adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-28
+
 ### Added
 
 - `RequestCancelled` (`system:request.cancelled`): the runtime tells whoever is working on a question that the client asking it has left, so it can stop, including a model request. Additive: older shards ignore it (brokspace/brok#219).
